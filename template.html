@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The exact middle of Seoul</title>
+<meta name="description" content="Thirteen answers to one question, every one computed from real data, with the working shown.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f6f3ec;--fg:#16140f;--mute:#6b665b;--line:rgba(0,0,0,.1);--card:#fffdf8;--acc:#c2410c;--acc2:#0f766e;--code:#efeadf}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0e0c;--fg:#ece7dc;--mute:#9a9385;--line:rgba(255,255,255,.1);--card:#17150f;--acc:#fb923c;--acc2:#2dd4bf;--code:#1f1c15}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 ui-serif,Georgia,"Apple SD Gothic Neo",serif}
+main{max-width:720px;margin:0 auto;padding:28px 18px 80px}
+h1{font-size:clamp(34px,9vw,58px);line-height:1.02;margin:.2em 0 .3em;letter-spacing:-.02em}
+h2{font-size:26px;margin:2.2em 0 .4em;letter-spacing:-.01em}
+h3{font:600 19px/1.3 -apple-system,system-ui,sans-serif;margin:0 0 .2em}
+.kick{font:600 12px/1 -apple-system,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--acc)}
+.lede{font-size:20px;color:var(--mute)}
+p{margin:.7em 0}
+.sans{font-family:-apple-system,system-ui,sans-serif}
+#map{height:min(70vh,520px);border-radius:14px;border:1px solid var(--line);margin:18px 0 8px;z-index:0}
+.legend{font:13px/1.5 -apple-system,system-ui,sans-serif;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px 12px;margin:14px 0}
+.card .n{font:700 12px/1 -apple-system,system-ui,sans-serif;color:var(--acc);letter-spacing:.08em}
+.coord{font:13px/1.4 ui-monospace,Menlo,monospace;color:var(--acc2);cursor:pointer}
+.here{font:14px/1.45 -apple-system,system-ui,sans-serif;color:var(--mute);margin:.3em 0}
+pre{background:var(--code);border-radius:10px;padding:10px 12px;overflow-x:auto;font:12.5px/1.5 ui-monospace,Menlo,monospace;margin:.6em 0;white-space:pre}
+details summary{cursor:pointer;font:600 13px/1.4 -apple-system,system-ui,sans-serif;color:var(--mute);margin-top:6px}
+table{width:100%;border-collapse:collapse;font:13px/1.4 -apple-system,system-ui,sans-serif}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--acc);border-radius:3px;opacity:.75}
+.verdict{border-left:4px solid var(--acc);padding:6px 0 6px 16px;font-size:21px;margin:1.2em 0}
+.chip{display:inline-block;font:600 11px/1 -apple-system,system-ui,sans-serif;padding:4px 7px;border-radius:99px;border:1px solid var(--line);color:var(--mute);margin-right:4px}
+.foot{font:13px/1.6 -apple-system,system-ui,sans-serif;color:var(--mute);margin-top:3em}
+a{color:var(--acc2)}
+.leaflet-container{background:var(--bg)}
+@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}}
+.pin{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<main>
+<div class="kick">A question, taken literally</div>
+<h1>Where is the exact middle of Seoul?</h1>
+<p class="lede">"Middle" is not one thing. It's a choice of what you're averaging: land, people, trains, a river, or history. I computed thirteen answers from real data and wrote down how each one was reached.</p>
+
+<div id="map"></div>
+<div class="legend">Tap a pin. <span style="color:var(--acc)">●</span> geometry &nbsp;<span style="color:#7c3aed">●</span> people &nbsp;<span style="color:#2563eb">●</span> subway &nbsp;<span style="color:#0891b2">●</span> river &nbsp;<span style="color:#a16207">●</span> markers on the ground</div>
+
+<h2>The inputs</h2>
+<p>Every number below comes from these, run through Python (shapely, pyproj, numpy) on a rented Linux box. Distances are measured in Korea's own metric projection (EPSG:5179), not in raw degrees, because a degree of longitude in Seoul is about 20% shorter than a degree of latitude.</p>
+<ul class="sans" style="font-size:15px" id="inputs"></ul>
+
+<h2>Thirteen middles</h2>
+<div id="cards"></div>
+
+<h2>How far apart they are</h2>
+<p>Distance from each answer to the point Seoul's own surveyors marked in 2009:</p>
+<table id="dist"></table>
+
+<h2>Why they disagree</h2>
+<p><b>Shape answers cluster on Namsan.</b> The area centroid, the pole of inaccessibility and the 2009 survey all sit within 600 m of each other on the mountain. Seoul is a rough blob with the Han cutting through, and the mountain happens to sit near where the land balances.</p>
+<p><b>Box answers drift west.</b> The bounding box and the smallest enclosing circle ignore everything except a few extreme points of the outline. Move one tip of Gangseo or Dobong and they move; the rest of the city doesn't count. That's why they land by City Hall and Seoul Station, 1.5 to 2 km from the shape answers.</p>
+<p><b>People pull it south.</b> More residents live south of the river (Gangnam, Songpa, Gwanak) than the shape alone suggests, so the population centers slide down Namsan's southern face toward Itaewon. By day, when offices in Gangnam and Yeouido fill up, it slides further south still.</p>
+<p><b>Time pulls it north-east, into the old downtown.</b> The subway was built radially out of the four-gate city. The stations where lines converge, Sindang and Dongdaemun History & Culture Park, are where every other station is closest by train. Geometry doesn't know this. Riders do.</p>
+<p><b>The markers are answers to older questions.</b> The road origin at Gwanghwamun is where distances to other cities are measured from: a center for the road network, not for the land. The 1896 stone in Insa-dong marked the middle of the walled city, which is a fraction of today's Seoul.</p>
+
+<h2>My verdict</h2>
+<div class="verdict" id="verdict"></div>
+<p id="verdict2"></p>
+
+<div class="foot" id="foot"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const R = __DATA__;
+const M = Object.fromEntries(R.middles.map(m => [m.key, m]));
+const N = R.notes, G = N.graph;
+const fmt = (a) => a[0].toFixed(6) + ", " + a[1].toFixed(6);
+const km = (m) => m < 1000 ? m + " m" : (m/1000).toFixed(2) + " km";
+const COL = {geo:"#c2410c", pop:"#7c3aed", sub:"#2563eb", river:"#0891b2", mark:"#a16207"};
+const T = {
+centroid:{g:"geo", how:"Take Seoul's administrative boundary (OSM relation 2297418, " + N.boundary_vertices + " vertices, " + N.area_km2 + " km²), project it to metres, and find the point where the area would balance on a pin. Every square metre counts equally.", code:`seoul = transform(to_5179, shape(boundary))
+c = seoul.centroid`, why:"Checked against a second, independent boundary built from the 426 administrative dongs: its centroid lands " + N.centroid_two_boundaries_m + " m away. The answer is stable."},
+bbox:{g:"geo", how:"Draw the tightest north-south/east-west rectangle around Seoul and take its center. Only four points of the outline matter: the westernmost, easternmost, northernmost and southernmost tips.", code:`minx, miny, maxx, maxy = seoul_ll.bounds
+center = ((minx+maxx)/2, (miny+maxy)/2)`, why:"Crude, and it shows: it lands in Sogong-dong near City Hall, over 2 km from the other shape answers."},
+pole:{g:"geo", how:"Find the point inside Seoul that is farthest from any border. The polylabel algorithm subdivides the polygon into cells and keeps refining the most promising ones until it's within 1 m.", code:`pole = polylabel(seoul, tolerance=1.0)
+seoul.exterior.distance(pole)  # metres to border`, why:"From here the nearest edge of Seoul is " + km(Math.round(M.pole.extra.distance_to_border_m)) + " away in every direction. This is the deepest point of the city."},
+mec:{g:"geo", how:"Find the smallest circle that contains all of Seoul and take its center.", code:`circle = shapely.minimum_bounding_circle(seoul)
+center = circle.centroid`, why:"Radius " + km(Math.round(M.mec.extra.radius_m)) + ". Like the box, it's set by a handful of extreme points, so it lands by Seoul Station."},
+popmean_night:{g:"pop", how:"Weight every one of the " + N.dongs_used + " administrative dongs by its night-time population (Seoul living-population data, 2025 average, " + (N.night_pop_total/1e6).toFixed(2) + "M people), place each at its dong's centroid, and average the positions.", code:`w = night_population            # per dong
+center = (X * w[:,None]).sum(0) / w.sum()`, why:"Night population is a close stand-in for where people live."},
+popmedian_night:{g:"pop", how:"The point that minimises the total straight-line distance from every resident. There's no formula for it; Weiszfeld's algorithm walks toward it by re-weighting each dong by 1/distance until it stops moving.", code:`y = mean
+for _ in range(5000):
+    d = norm(X - y, axis=1)
+    y = (X * (w/d)[:,None]).sum(0) / (w/d).sum()`, why:"Converged in " + M.popmedian_night.extra.iterations + " steps. The average resident is " + M.popmedian_night.extra.mean_dist_km + " km away in a straight line. If you built one thing for everyone who sleeps in Seoul, this is where it goes."},
+popmean_day:{g:"pop", how:"Same as above, weighted by daytime population (" + (N.day_pop_total/1e6).toFixed(2) + "M people), which counts workers and visitors where they actually are during the day.", code:`w = day_population
+center = (X * w[:,None]).sum(0) / w.sum()`, why:"Daytime Seoul is heavier in Gangnam, Jongno and Yeouido, so this slides further south."},
+popmedian_day:{g:"pop", how:"The geometric median again, for daytime population.", code:`weiszfeld(X, day_population)`, why:"Average daytime person is " + M.popmedian_day.extra.mean_dist_km + " km away."},
+stations:{g:"sub", how:"Every subway station inside Seoul from OpenStreetMap (" + M.stations.extra.osm_nodes + " station nodes, merged by name into " + M.stations.extra.stations + " stations; a transfer station counts once). Average their positions.", code:`stations = overpass('nwr[railway=station][station=subway]')
+center = mean(project(stations))`, why:"Lands on Namsan too. The network covers the city evenly enough that its geometric center is the city's."},
+time_mean:{g:"sub", how:"Build the Seoul Metro network for lines 1–8 as a graph: " + G.stations + " stations, edges weighted by scheduled minutes between neighbours (+" + G.dwell_min + " min dwell), plus " + G.transfer_edges + " transfer links timed by the walk between platforms. Run Dijkstra from every station and find the one with the lowest average ride to all the others.", code:`for s in stations:
+    t = dijkstra(G, s)
+    avg[s] = mean(t[x] for x in stations if x != s)
+best = min(avg, key=avg.get)`, why:"Sindang: on average " + M.time_mean.extra.avg_min + " minutes to any other station. Top five: " + G.top10_mean.slice(0,5).map(x=>x[0]+" "+x[1]).join(", ") + ". The worst, " + G.bottom5_mean[4][0] + ", averages " + G.bottom5_mean[4][1] + "."},
+time_minimax:{g:"sub", how:"Same graph, different question: which station makes the longest trip as short as possible? This is the fairest meeting point when the person farthest away matters most.", code:`best = min(stations, key=lambda s: max(dijkstra(G, s).values()))`, why:"Dongdaemun History & Culture Park: nowhere on lines 1–8 is more than " + M.time_minimax.extra.max_min + " minutes away. Runner-up: Apgujeong at " + G.top5_minimax[1][1] + "."},
+han:{g:"river", how:"Take the Han River's centerline from OpenStreetMap, clip it to Seoul's boundary, and walk halfway along it.", code:`han = linemerge(osm_ways('waterway=river', name='한강'))
+inside = han.intersection(seoul)
+mid = inside.interpolate(inside.length / 2)`, why:"The river runs " + M.han.extra.in_seoul_km + " km through Seoul. Its midpoint sits by Seobinggo, right below Namsan. The river and the mountain are roughly stacked on the same north–south line."},
+doro_wonpyo:{g:"mark", how:"Not computed: this is the zero point every road distance to Seoul is measured to. Placed in 1914 at the Sejongno intersection; the Road Act puts it at Gwanghwamun.", code:`# 진표: 37°34′12.63″N 126°58′37.73″E (ko.wikipedia 도로원표)`, why:"It's the middle of the road network, chosen as a seat of government. It was never meant as the middle of the land."},
+survey2009:{g:"mark", how:"In late 2008 Seoul and Jung-gu surveyed the city's geographic center by GPS and announced it in January 2009: 37°33′06.8904″N, 126°59′30.664″E, on Namsan between the tunnel management office and the N Seoul Tower car park.", code:`# Hankook Ilbo, 13 Jan 2009; Asia Economy, 12 Jan 2009`, why:"My area centroid lands " + M.centroid.to_survey2009_m + " m from it. Seoul's surveyors were computing the centroid, and they got it right."},
+marker_namsan:{g:"mark", how:"The surveyed point sits in protected forest, so the city placed the monument about 200 m away near N Seoul Tower, at 267 m elevation, where an old survey marker stood.", code:`# 37°33′06.6″N 126°59′19.6″E (Atlas News)`, why:"This is the one you can visit. It's " + M.marker_namsan.to_survey2009_m + " m from the real point."},
+stone1896:{g:"mark", how:"A granite stone set in 1896 to mark the center of the walled capital, now inside the Hanaro Building lobby in Insa-dong. Seoul Future Heritage 2013-147.", code:`# 37.5720865, 126.9854332 (ko.wikipedia 서울의 중심점 표지석)`, why:"The middle of a city that was a few square kilometres. Seoul has grown roughly 30 times since."}
+};
+const ORDER = ["centroid","pole","bbox","mec","popmean_night","popmedian_night","popmean_day","popmedian_day","stations","time_mean","time_minimax","han","survey2009","marker_namsan","doro_wonpyo","stone1896"];
+const NAMES = {centroid:"Area centroid",bbox:"Bounding-box center",pole:"Pole of inaccessibility",mec:"Center of the smallest enclosing circle",popmean_night:"Where residents average out",popmedian_night:"Shortest total trip for residents",popmean_day:"Where the daytime crowd averages out",popmedian_day:"Shortest total trip for the daytime crowd",stations:"Center of all subway stations",time_mean:"Shortest average subway ride",time_minimax:"Shortest worst-case subway ride",han:"Halfway down the Han",doro_wonpyo:"도로원표, the road-distance origin",survey2009:"Seoul's 2009 GPS survey",marker_namsan:"The 서울중심점 monument",stone1896:"The 1896 center stone"};
+const short = (h) => h ? h.split(", ").slice(0,4).join(", ") : "";
+
+// inputs
+document.getElementById("inputs").innerHTML = [
+ `Seoul boundary: OpenStreetMap relation 2297418 via Nominatim (${N.area_km2} km²)`,
+ `${N.dongs_used} administrative dongs: <a href="https://github.com/vuski/admdongkor">vuski/admdongkor</a> (Jan 2025 boundaries)`,
+ `Day/night population per dong: Seoul Open Data OA-23016 living population, 2025 average, via <a href="https://github.com/idonon0623/seoul-living-population-analysis">this processed set</a>`,
+ `Subway stations: OpenStreetMap (Overpass)`,
+ `Subway travel times and transfers: Seoul Metro (서울교통공사) inter-station time and transfer tables, lines 1–8, via <a href="https://github.com/haliunaaenhee0715/seoul-subway-distance">this repo</a>`,
+ `Han River centerline: OpenStreetMap`,
+ `What's at each point: Nominatim reverse geocoding`,
+ `Markers: press reports and Wikipedia, cited on each card`
+].map(x=>`<li>${x}</li>`).join("");
+
+// map
+const map = L.map("map",{scrollWheelZoom:false,tap:true}).setView([37.556,126.99],11);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+L.geoJSON(R.boundary,{style:{color:"#c2410c",weight:2,fillOpacity:.05}}).addTo(map);
+L.polyline(R.han_line,{color:"#0891b2",weight:3,opacity:.6}).addTo(map);
+const mk = {};
+ORDER.forEach((k,i) => {
+  const m = M[k]; if(!m) return; const c = COL[T[k].g];
+  const icon = L.divIcon({className:"",html:`<div class="pin" style="background:${c}"></div>`,iconSize:[14,14],iconAnchor:[7,7]});
+  mk[k] = L.marker(m.latlon,{icon}).addTo(map).bindPopup(`<b>${i+1}. ${NAMES[k]}</b><br>${fmt(m.latlon)}<br><small>${short(m.here)}</small><br><a href="#c-${k}">how →</a>`);
+});
+const cards = document.getElementById("cards");
+ORDER.forEach((k,i) => {
+  const m = M[k]; const t = T[k];
+  const d = document.createElement("div"); d.className="card"; d.id="c-"+k;
+  d.innerHTML = `<div class="n">${String(i+1).padStart(2,"0")} · ${({geo:"SHAPE",pop:"PEOPLE",sub:"SUBWAY",river:"RIVER",mark:"ON THE GROUND"})[t.g]}</div>
+  <h3>${NAMES[k]}</h3>
+  <div class="coord" data-k="${k}">${fmt(m.latlon)} ↗ show on map</div>
+  <div class="here">📍 ${short(m.here)}${m.here_en?`<br><span style="opacity:.8">${short(m.here_en)}</span>`:""}</div>
+  <p>${t.how}</p><pre>${t.code.replace(/</g,"&lt;")}</pre><p>${t.why}</p>
+  <span class="chip">${km(m.to_survey2009_m)} from the 2009 survey point</span>`;
+  cards.appendChild(d);
+});
+document.querySelectorAll(".coord").forEach(e => e.onclick = () => { const k=e.dataset.k; document.getElementById("map").scrollIntoView({behavior:"smooth"}); map.setView(M[k].latlon,16); mk[k].openPopup(); });
+// distance table
+const rows = ORDER.filter(k=>k!=="survey2009").map(k=>[k,M[k].to_survey2009_m]).sort((a,b)=>a[1]-b[1]);
+const mx = Math.max(...rows.map(r=>r[1]));
+document.getElementById("dist").innerHTML = "<tr><th>Middle</th><th class=r>to survey</th><th style='width:35%'></th></tr>" + rows.map(([k,v])=>`<tr><td>${NAMES[k]}</td><td class=r>${km(v)}</td><td><div class=bar style="width:${(v/mx*100).toFixed(1)}%;background:${COL[T[k].g]}"></div></td></tr>`).join("");
+// verdict
+const c = M.centroid;
+document.getElementById("verdict").innerHTML = `The middle of Seoul is on the north slope of Namsan, at <b>${fmt(c.latlon)}</b>.`;
+document.getElementById("verdict2").innerHTML = `Not because the city says so: because three unrelated ways of asking land there. The shape of the land puts it here. Seoul's own 2009 survey put it ${c.to_survey2009_m} m away. The people who live in Seoul average out ${km(R.dist_m.centroid.popmean_night)} away, and the subway stations ${km(R.dist_m.centroid.stations)} away. When land, people and rails agree within a kilometre, that's the answer. The one honest exception is time: if you're actually trying to meet someone, go to <b>Sindang</b>. On the train, that's the real middle.`;
+document.getElementById("foot").innerHTML = `Computed ${R.generated}. Source, data and the script that produced every number: <a href="__REPO__">__REPO__</a>. Caveats: the subway graph covers Seoul Metro lines 1–8 only (not line 9, the Shinbundang line or Korail), uses scheduled run times and ignores waiting for trains. Population is the 2025 average of Seoul's living-population estimates, placed at each dong's centroid. Made by Seal.`;
+</script>
+</body>
+</html>
